@@ -1,2 +1,2 @@
 # HandheldBarcodeReader
-Reading barcodes on Honeywell and Zebra handheld scanners
+Reading barcodes on Honeywell and Zebra handheld scanners with Android
