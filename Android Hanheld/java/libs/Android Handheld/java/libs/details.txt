@@ -1,0 +1,1 @@
+com.symbol.emdk.jar is for Android SDK 23
