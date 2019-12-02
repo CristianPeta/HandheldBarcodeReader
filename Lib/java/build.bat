@@ -29,9 +29,9 @@ if x%VERBOSE% == x1 SET VERBOSE_FLAG=v
 @echo OFF
 
 @echo ON
-del "..\..\Android Handheld Demo 10.3 Rio\Android\Release\NativeActivitySubclass-dexed.jar"
-del "..\..\Android Handheld Demo 10.2 Tokyo\Android\Release\NativeActivitySubclass-dexed.jar"
-del "..\..\WAEagle_ClientGetMob\Android\Release\NativeActivitySubclass-dexed.jar"
+del "..\..\Demo 10.3 Rio\Android\Release\NativeActivitySubclass-dexed.jar"
+del "..\..\Demo 10.2 Tokyo\Android\Release\NativeActivitySubclass-dexed.jar"
+del "..\..\..\WAEagle_ClientGetMob\Android\Release\NativeActivitySubclass-dexed.jar"
 @echo OFF
 
 :Exit

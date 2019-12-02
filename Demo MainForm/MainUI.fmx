@@ -3,7 +3,7 @@ object Form1: TForm1
   Top = 0
   Caption = 'Form1'
   ClientHeight = 491
-  ClientWidth = 698
+  ClientWidth = 596
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -13,7 +13,7 @@ object Form1: TForm1
     Anchors = [akLeft, akTop, akRight]
     Position.X = 8.000000000000000000
     Position.Y = 48.000000000000000000
-    Size.Width = 688.000000000000000000
+    Size.Width = 586.000000000000000000
     Size.Height = 33.000000000000000000
     Size.PlatformDefault = False
     Text = '...'
@@ -97,7 +97,7 @@ object Form1: TForm1
     Margins.Left = 5.000000000000000000
     Position.X = 5.000000000000000000
     Position.Y = 443.000000000000000000
-    Size.Width = 693.000000000000000000
+    Size.Width = 591.000000000000000000
     Size.Height = 48.000000000000000000
     Size.PlatformDefault = False
     Text = 'Start ZXing'

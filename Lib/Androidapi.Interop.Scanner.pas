@@ -21,7 +21,9 @@ uses
   Androidapi.JNI.App,
   Androidapi.JNI.GraphicsContentViewText,
   Androidapi.JNIBridge,
-  Androidapi.JNI.Toast,
+  {$IFDEF AndroidToast}
+    Androidapi.JNI.Toast,
+  {$ENDIF}
   FMX.Helpers.Android,
   FMX.Platform.Android,
 {$ENDIF}
@@ -84,8 +86,10 @@ var
 begin
   ResolveInfo := TAndroidHelper.Activity.getPackageManager.resolveActivity(Intent, 0);
   Result := ResolveInfo <> nil;
+  {$IFDEF AndroidToast}
   if Result then
     TAndroidHelper.Activity.startActivityForResult(Intent, RequestCode);
+  {$ENDIF}
 end;
 
 procedure LaunchZXingScanner(RequestCode: Integer);
@@ -96,8 +100,10 @@ begin
   Intent.setPackage(StringToJString('com.google.zxing.client.android'));
   // If you want to target QR codes
   //Intent.putExtra(StringToJString('SCAN_MODE'), StringToJString('QR_CODE_MODE'));
+  {$IFDEF AndroidToast}
   if not LaunchActivityForResult(Intent, RequestCode) then
     Toast('Cannot display ZXing scanner', ShortToast);
+  {$ENDIF}
 end;
 
 // This is called from the Java activity's onBarCodeCompleteNative() method
@@ -233,7 +239,7 @@ begin
       end;
     TScannerType.Zebra:
       begin
-//se elibereaza in java
+//Java code takes care of this so no action here
 //        Log.d('+WA_Zebra_Destroy_EMDKManager');
 //        TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_Zebra_Destroy_EMDKManager;
 //        Log.d('-WA_Zebra_Destroy_EMDKManager');
@@ -286,13 +292,17 @@ begin
       begin
         ScanContent := JStringToString(Data.getStringExtra(StringToJString('SCAN_RESULT')));
         ScanFormat := JStringToString(Data.getStringExtra(StringToJString('SCAN_RESULT_FORMAT')));
+        {$IFDEF AndroidToast}
         Toast(ScanContent, LongToast);
+        {$ENDIF}
         OnScannerCompleted(ScanFormat, ScanContent);
       end;
     end
     else if ResultCode = TJActivity.JavaClass.RESULT_CANCELED then
     begin
+      {$IFDEF AndroidToast}
       Toast('You cancelled the scan', ShortToast);
+      {$ENDIF}
     end;
     Result := True;
   end;
