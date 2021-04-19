@@ -42,6 +42,38 @@ type
 implementation
 
 {$IFDEF Android}
+const
+  // DataWedge Extras
+  EXTRA_GET_VERSION_INFO = 'com.symbol.datawedge.api.GET_VERSION_INFO';
+  EXTRA_CREATE_PROFILE = 'com.symbol.datawedge.api.CREATE_PROFILE';
+  EXTRA_KEY_APPLICATION_NAME = 'com.symbol.datawedge.api.APPLICATION_NAME';
+  EXTRA_KEY_NOTIFICATION_TYPE = 'com.symbol.datawedge.api.NOTIFICATION_TYPE';
+  EXTRA_SOFT_SCAN_TRIGGER = 'com.symbol.datawedge.api.SOFT_SCAN_TRIGGER';
+  EXTRA_RESULT_NOTIFICATION = 'com.symbol.datawedge.api.NOTIFICATION';
+  EXTRA_REGISTER_NOTIFICATION = 'com.symbol.datawedge.api.REGISTER_FOR_NOTIFICATION';
+  EXTRA_UNREGISTER_NOTIFICATION = 'com.symbol.datawedge.api.UNREGISTER_FOR_NOTIFICATION';
+  EXTRA_SET_CONFIG = 'com.symbol.datawedge.api.SET_CONFIG';
+
+  EXTRA_RESULT_NOTIFICATION_TYPE = 'NOTIFICATION_TYPE';
+  EXTRA_KEY_VALUE_SCANNER_STATUS = 'SCANNER_STATUS';
+  EXTRA_KEY_VALUE_PROFILE_SWITCH = 'PROFILE_SWITCH';
+  EXTRA_KEY_VALUE_CONFIGURATION_UPDATE = 'CONFIGURATION_UPDATE';
+  EXTRA_KEY_VALUE_NOTIFICATION_STATUS = 'STATUS';
+  EXTRA_KEY_VALUE_NOTIFICATION_PROFILE_NAME = 'PROFILE_NAME';
+  EXTRA_SEND_RESULT = 'SEND_RESULT';
+
+  EXTRA_EMPTY = '';
+
+  EXTRA_RESULT_GET_VERSION_INFO = 'com.symbol.datawedge.api.RESULT_GET_VERSION_INFO';
+  EXTRA_RESULT = 'RESULT';
+  EXTRA_RESULT_INFO = 'RESULT_INFO';
+  EXTRA_COMMAND = 'COMMAND';
+
+  // DataWedge Actions
+  ACTION_DATAWEDGE = 'com.symbol.datawedge.api.ACTION';
+  ACTION_RESULT_NOTIFICATION = 'com.symbol.datawedge.api.NOTIFICATION_ACTION';
+  ACTION_RESULT = 'com.symbol.datawedge.api.RESULT_ACTION';
+
 { TZebraDW_BarCodeScanner }
 
 constructor TZebraDW_BarCodeScanner.Create(AOnScannerCompleted: TOnScannerCompleted);
@@ -84,7 +116,7 @@ begin
   // Send DataWedge intent with extra to create profile
   // Use CREATE_PROFILE: http://techdocs.zebra.com/datawedge/latest/guide/api/createprofile/
   sendDataWedgeIntentWithExtra(
-    StringToJString('com.symbol.datawedge.api.ACTION'),
+    StringToJString(ACTION_DATAWEDGE),
     StringToJString('com.symbol.datawedge.api.CREATE_PROFILE'),
     profileName);
 
@@ -113,7 +145,7 @@ begin
   profileConfig.putParcelableArray(StringToJString('APP_LIST'), TJavaObjectArray<JParcelable>(appConfigList));
   profileConfig.remove(StringToJString('PLUGIN_CONFIG'));
   // Use SET_CONFIG: http://techdocs.zebra.com/datawedge/latest/guide/api/setconfig/
-  sendDataWedgeIntentWithExtra(StringToJString('com.symbol.datawedge.api.ACTION'), StringToJString('com.symbol.datawedge.api.SET_CONFIG'), profileConfig);
+  sendDataWedgeIntentWithExtra(StringToJString(ACTION_DATAWEDGE), StringToJString(EXTRA_SET_CONFIG), profileConfig);
 
   // Configure keystroke output plugin
   keystrokeConfig := TJBundle.JavaClass.init;
@@ -122,7 +154,7 @@ begin
   keystrokeProps.putString(StringToJString('keystroke_output_enabled'), StringToJString('false'));
   keystrokeConfig.putBundle(StringToJString('PARAM_LIST'), keystrokeProps);
   profileConfig.putBundle(StringToJString('PLUGIN_CONFIG'), keystrokeConfig);
-  sendDataWedgeIntentWithExtra(StringToJString('com.symbol.datawedge.api.ACTION'), StringToJString('com.symbol.datawedge.api.SET_CONFIG'), profileConfig);
+  sendDataWedgeIntentWithExtra(StringToJString(ACTION_DATAWEDGE), StringToJString(EXTRA_SET_CONFIG), profileConfig);
 
   // Configure intent output for captured data to be sent to this app
   intentConfig := TJBundle.JavaClass.init;
@@ -130,12 +162,12 @@ begin
   intentConfig.putString(StringToJString('RESET_CONFIG'), StringToJString('true'));
   intentProps := TJBundle.JavaClass.init;
   intentProps.putString(StringToJString('intent_output_enabled'), StringToJString('true'));
-  intentProps.putString(StringToJString('intent_action'), FIntentActionName);//din manifest: <action android:name="%package%.ZebraDW.ACTION" />
+  intentProps.putString(StringToJString('intent_action'), FIntentActionName);//from manifest: <action android:name="%package%.ZebraDW.ACTION" />
   intentProps.putString(StringToJString('intent_category'), StringToJString('android.intent.category.DEFAULT'));
   intentProps.putString(StringToJString('intent_delivery'), StringToJString('0'));//0 = Start Activity
   intentConfig.putBundle(StringToJString('PARAM_LIST'), intentProps);
   profileConfig.putBundle(StringToJString('PLUGIN_CONFIG'), intentConfig);
-  sendDataWedgeIntentWithExtra(StringToJString('com.symbol.datawedge.api.ACTION'), StringToJString('com.symbol.datawedge.api.SET_CONFIG'), profileConfig);
+  sendDataWedgeIntentWithExtra(StringToJString(ACTION_DATAWEDGE), StringToJString(EXTRA_SET_CONFIG), profileConfig);
 end;
 
 procedure TZebraDW_BarCodeScanner.HandleActivityMessage(const Sender: TObject; const M: TMessage);
