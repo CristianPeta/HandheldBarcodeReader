@@ -26,6 +26,9 @@ uses
   {$ENDIF}
   FMX.Helpers.Android,
   FMX.Platform.Android,
+
+  Androidapi.Interop.Scanner.Types,
+  Androidapi.Interop.Scanner.ZebraDW,
 {$ENDIF}
   FMX.Dialogs,
   FMX.Types;
@@ -39,19 +42,22 @@ const
   ERR_CANT_DISP_BC_SCANNER = -1; // Error: Cannot display Barcode scanner
 
 type
-  TOnScannerCompleted = procedure(ScanFormat, ScanContent: string) of object;
-  TOnScannerStatus = procedure(AStatus: String) of object;
-
 {$SCOPEDENUMS ON}
-  TScannerType = (No, ZXing, Honeywell70e, Honeywell75e, Zebra);
+  TScannerType = (No, ZXing, Honeywell70e, Honeywell75e, ZebraEMDK, ZebraDataWedge);
 
   TBarCodeScanner = class(THandheld)
   private
     FScanRequestCode: Integer;
     FScannerType: TScannerType;
+    FZebra_EMDKManager_Created: Boolean;
+    {$IFDEF BarcodeReader}
+    FZebraDW: TZebraDW_BarCodeScanner;
+    {$ENDIF}
+    FOnScannerCompleted: TOnScannerCompleted;
 
     procedure ProcOnKeyDown(Keycode: Word);
     procedure SetScannerType(const Value: TScannerType);
+    procedure SetOnScannerCompleted(const Value: TOnScannerCompleted);
     //ZXing
     const ScanRequestCode = 0;
     var FMessageSubscriptionID: Integer;
@@ -59,8 +65,8 @@ type
     function OnActivityResult(RequestCode, ResultCode: Integer; Data: JIntent): Boolean;
   public
     {Public declarations}
-    OnScannerCompleted: TOnScannerCompleted;
     OnScannerStatus: TOnScannerStatus;//for now only Zebra
+    property OnScannerCompleted: TOnScannerCompleted read FOnScannerCompleted write SetOnScannerCompleted;
     procedure DoTriggerScan;
     constructor Create;
     {$IFDEF BarcodeReader}
@@ -110,15 +116,10 @@ end;
 procedure onBarCodeCompleteNative(PEnv: PJNIEnv; This: JNIObject; BarCode: JNIString); cdecl;
 begin
   Log.d('+onBarCodeCompleteNative');
-  Log.d('Thread (Main: %.8x, Current: %.8x, Java:%.8d (%2:.8x), POSIX:%.8x)',
-    [MainThreadID, TThread.CurrentThread.ThreadID,
-    TJThread.JavaClass.CurrentThread.getId, GetCurrentThreadID]);
   {$IFDEF BarcodeReader}
-  If Assigned(BarCodeScanner) then
-    if Assigned(BarCodeScanner.OnScannerCompleted) Then
-      BarCodeScanner.OnScannerCompleted('', JNIStringToString(PEnv, BarCode));
+  if Assigned(BarCodeScanner) and Assigned(BarCodeScanner.OnScannerCompleted) Then
+    BarCodeScanner.OnScannerCompleted('', JNIStringToString(PEnv, BarCode));
   {$ENDIF}
-  Log.d('Synchronize is over');
   Log.d('-onBarCodeCompleteNative');
 end;
 
@@ -127,8 +128,7 @@ procedure onScannerStatusNative(PEnv: PJNIEnv; This: JNIObject; Status: JNIStrin
 begin
   Log.d('+onScannerStatusNative');
   {$IFDEF BarcodeReader}
-  If Assigned(BarCodeScanner) then
-    if Assigned(BarCodeScanner.OnScannerStatus) Then
+  if Assigned(BarCodeScanner) and Assigned(BarCodeScanner.OnScannerStatus) Then
       BarCodeScanner.OnScannerStatus(JNIStringToString(PEnv, Status));
   {$ENDIF}
   Log.d('-onScannerStatusNative');
@@ -141,7 +141,17 @@ var
   NativeMethods: array [0 .. 1] of JNINativeMethod;
 begin
   inherited;
+  FScannerType := TScannerType.No;
+  FZebra_EMDKManager_Created := False;
+  FScanRequestCode := 0;
+
+  OnKeyDown := Self.ProcOnKeyDown;
+  OnScannerCompleted := nil;
+  OnScannerStatus := nil;
+
   {$IFDEF BarcodeReader}
+  FZebraDW := nil;
+
   Log.d('Starting the registration JNI stuff');
   PEnv := TJNIResolver.GetJNIEnv;
   Log.d('Registering interop methods');
@@ -162,25 +172,13 @@ begin
   PEnv^.RegisterNatives(PEnv, ActivityClass, @NativeMethods[0], 2);//2 functions to register
   PEnv^.DeleteLocalRef(PEnv, ActivityClass);
   {$ENDIF}
-
-  FScannerType := TScannerType.No;
-
-  FScanRequestCode := 0;
-
-  OnKeyDown := Self.ProcOnKeyDown;
-  OnScannerCompleted := nil;
-  OnScannerStatus := nil;
-
-  //we create Zebra EMDKManager here after registering onScannerStatusNative
-  Log.d('+WA_Zebra_Create_EMDKManager');
-  TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_Zebra_Create_EMDKManager;
-  Log.d('-WA_Zebra_Create_EMDKManager');
 end;
 
 destructor TBarCodeScanner.Destroy;
 begin
   inherited;
   {$IFDEF BarcodeReader}
+  FZebraDW.Free;
   DestroyDecodeManager;
   {$ENDIF}
 end;
@@ -210,12 +208,16 @@ begin
         TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_75e_Create_aidcManager;
         Log.d('-WA_75e_Create_aidcManager');
       end;
-    TScannerType.Zebra:
+    TScannerType.ZebraEMDK:
       begin
-//Se creaza la TBarCodeScanner.Create()
-//        Log.d('+WA_Zebra_Create_EMDKManager');
-//        TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_Zebra_Create_EMDKManager;
-//        Log.d('-WA_Zebra_Create_EMDKManager');
+        //Zebra EMDKManager must be created here after registering onScannerStatusNative
+        //and only one time
+        if not FZebra_EMDKManager_Created then begin
+          Log.d('+WA_Zebra_Create_EMDKManager');
+          TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_Zebra_Create_EMDKManager;
+          FZebra_EMDKManager_Created := True;
+          Log.d('-WA_Zebra_Create_EMDKManager');
+        end;
       end;
   end;
 end;
@@ -237,12 +239,15 @@ begin
         TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_75e_Destroy_aidcManager;
         Log.d('-WA_75e_Destroy_aidcManager');
       end;
-    TScannerType.Zebra:
+    TScannerType.ZebraEMDK:
       begin
 //Java code takes care of this so no action here
 //        Log.d('+WA_Zebra_Destroy_EMDKManager');
 //        TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_Zebra_Destroy_EMDKManager;
 //        Log.d('-WA_Zebra_Destroy_EMDKManager');
+      end;
+    TScannerType.ZebraDataWedge:
+      begin
       end;
   end;
 end;
@@ -308,19 +313,32 @@ begin
   end;
 end;
 
+procedure TBarCodeScanner.SetOnScannerCompleted(const Value: TOnScannerCompleted);
+begin
+  FOnScannerCompleted := Value;
+  {$IFDEF BarcodeReader}
+  if Assigned(FZebraDW) then
+    FZebraDW.OnScannerCompleted := Value;
+  {$ENDIF}
+end;
+
 procedure TBarCodeScanner.SetScannerType(const Value: TScannerType);
 begin
   Log.d('+SetScannerType');
-  Log.d('Thread (Main: %.8x, Current: %.8x, Java:%.8d (%2:.8x), POSIX:%.8x)',
-    [MainThreadID, TThread.CurrentThread.ThreadID,
-    TJThread.JavaClass.CurrentThread.getId, GetCurrentThreadID]);
-
   if Value <> FScannerType then begin
-    {$IFDEF BarcodeReader}DestroyDecodeManager;{$ENDIF}
+    {$IFDEF BarcodeReader}
+    DestroyDecodeManager;
+    {$ENDIF}
     FScannerType := Value;
-    {$IFDEF BarcodeReader}CreateDecodeManager;{$ENDIF}
+    {$IFDEF BarcodeReader}
+    CreateDecodeManager;
+    //For ZEBRA DataWedge
+    if FScannerType = TScannerType.ZebraDataWedge then
+      FZebraDW := TZebraDW_BarCodeScanner.Create(OnScannerCompleted)
+    else
+      FreeAndNil(FZebraDW);
+    {$ENDIF}
   end;
-
   Log.d('-SetScannerType');
 end;
 {$ENDIF Android}
