@@ -36,6 +36,8 @@ type
     property OnScannerCompleted: TOnScannerCompleted read FOnScannerCompleted write FOnScannerCompleted;
     constructor Create(AOnScannerCompleted: TOnScannerCompleted);
     destructor Destroy; override;
+    procedure Subscribe;
+    procedure Unsubscribe;
   end;
 {$ENDIF}
 
@@ -84,15 +86,14 @@ begin
   // Note: A corresponding <action> tag must also exist in the <intent-filter> section of AndroidManifest.template.xml.
   FIntentActionName := TAndroidHelper.Context.getPackageName.concat(StringToJString('.ZebraDW.ACTION'));
   MainActivity.registerIntentAction(FIntentActionName);
-  FMessageSubscriptionID := TMessageManager.DefaultManager.SubscribeToMessage(TMessageReceivedNotification, HandleActivityMessage);
+  Subscribe;
 
   CreateDataWedgeConfig;
 end;
 
 destructor TZebraDW_BarCodeScanner.Destroy;
 begin
-  if FMessageSubscriptionID <> 0  then
-    TMessageManager.DefaultManager.Unsubscribe(TMessageResultNotification, FMessageSubscriptionID);
+  Unsubscribe;
   inherited;
 end;
 
@@ -195,6 +196,19 @@ begin
   Intent := TJIntent.JavaClass.init(action);
   Intent.putExtra(extraKey, extraValue);
   TAndroidHelper.Activity.sendBroadcast(Intent);
+end;
+
+procedure TZebraDW_BarCodeScanner.Subscribe;
+begin
+  FMessageSubscriptionID := TMessageManager.DefaultManager.SubscribeToMessage(TMessageReceivedNotification, HandleActivityMessage);
+end;
+
+procedure TZebraDW_BarCodeScanner.Unsubscribe;
+begin
+  if FMessageSubscriptionID <> 0  then begin
+    TMessageManager.DefaultManager.Unsubscribe(TMessageResultNotification, FMessageSubscriptionID);
+    FMessageSubscriptionID := 0;
+  end;
 end;
 
 procedure TZebraDW_BarCodeScanner.sendDataWedgeIntentWithExtra(action, extraKey: JString; extras: JBundle);

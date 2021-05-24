@@ -217,7 +217,12 @@ begin
           TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_Zebra_Create_EMDKManager;
           FZebra_EMDKManager_Created := True;
           Log.d('-WA_Zebra_Create_EMDKManager');
-        end;
+        end
+      end;
+    TScannerType.ZebraDataWedge:
+      begin
+        if Assigned(FZebraDW) then
+          FZebraDW.Subscribe;
       end;
   end;
 end;
@@ -248,6 +253,8 @@ begin
       end;
     TScannerType.ZebraDataWedge:
       begin
+        if Assigned(FZebraDW) then
+          FZebraDW.Unsubscribe;
       end;
   end;
 end;
@@ -333,8 +340,10 @@ begin
     {$IFDEF BarcodeReader}
     CreateDecodeManager;
     //For ZEBRA DataWedge
-    if FScannerType = TScannerType.ZebraDataWedge then
-      FZebraDW := TZebraDW_BarCodeScanner.Create(OnScannerCompleted)
+    if FScannerType = TScannerType.ZebraDataWedge then begin
+      if FZebraDW = nil then
+        FZebraDW := TZebraDW_BarCodeScanner.Create(OnScannerCompleted);
+    end
     else
       FreeAndNil(FZebraDW);
     {$ENDIF}
