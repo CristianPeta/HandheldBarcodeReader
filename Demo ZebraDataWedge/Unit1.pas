@@ -44,7 +44,6 @@ end;
 procedure TForm1.OnScannerCompleted(ScanFormat, ScanContent: string);
 begin
   Memo1.Lines.Add(TimeToStr(Now) + ': ' + ScanContent);
-//  Invalidate;
 end;
 
 end.
