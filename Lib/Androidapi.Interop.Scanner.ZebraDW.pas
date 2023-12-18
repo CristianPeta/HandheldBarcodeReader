@@ -27,6 +27,7 @@ type
     FIntentActionName: JString;
     FMessageSubscriptionID: Integer;
     FOnScannerCompleted: TOnScannerCompleted;
+    FAutoSubscribe: Boolean;
     procedure CreateDataWedgeConfig;
     procedure HandleActivityMessage(const Sender: TObject; const M: TMessage);
     function HandleIntentAction(const Data: JIntent): Boolean;
@@ -34,7 +35,7 @@ type
     procedure sendDataWedgeIntentWithExtra(action, extraKey, extraValue: JString); overload;
   public
     property OnScannerCompleted: TOnScannerCompleted read FOnScannerCompleted write FOnScannerCompleted;
-    constructor Create(AOnScannerCompleted: TOnScannerCompleted);
+    constructor Create(AOnScannerCompleted: TOnScannerCompleted; AutoSubscribe: Boolean = True);
     destructor Destroy; override;
     procedure Subscribe;
     procedure Unsubscribe;
@@ -78,22 +79,26 @@ const
 
 { TZebraDW_BarCodeScanner }
 
-constructor TZebraDW_BarCodeScanner.Create(AOnScannerCompleted: TOnScannerCompleted);
+constructor TZebraDW_BarCodeScanner.Create(AOnScannerCompleted: TOnScannerCompleted; AutoSubscribe: Boolean);
 begin
   OnScannerCompleted := AOnScannerCompleted;
+  FMessageSubscriptionID := 0;
+  FAutoSubscribe := AutoSubscribe;
 
   // Register the type of intent action that we want to be able to receive.
   // Note: A corresponding <action> tag must also exist in the <intent-filter> section of AndroidManifest.template.xml.
   FIntentActionName := TAndroidHelper.Context.getPackageName.concat(StringToJString('.ZebraDW.ACTION'));
   MainActivity.registerIntentAction(FIntentActionName);
-  Subscribe;
+  if FAutoSubscribe then
+    Subscribe;
 
   CreateDataWedgeConfig;
 end;
 
 destructor TZebraDW_BarCodeScanner.Destroy;
 begin
-  Unsubscribe;
+  if FAutoSubscribe then
+    Unsubscribe;
   inherited;
 end;
 
@@ -200,7 +205,9 @@ end;
 
 procedure TZebraDW_BarCodeScanner.Subscribe;
 begin
-  FMessageSubscriptionID := TMessageManager.DefaultManager.SubscribeToMessage(TMessageReceivedNotification, HandleActivityMessage);
+  if FMessageSubscriptionID = 0  then begin
+    FMessageSubscriptionID := TMessageManager.DefaultManager.SubscribeToMessage(TMessageReceivedNotification, HandleActivityMessage);
+  end;
 end;
 
 procedure TZebraDW_BarCodeScanner.Unsubscribe;

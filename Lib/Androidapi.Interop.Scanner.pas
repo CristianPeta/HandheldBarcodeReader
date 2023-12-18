@@ -342,7 +342,7 @@ begin
     //For ZEBRA DataWedge
     if FScannerType = TScannerType.ZebraDataWedge then begin
       if FZebraDW = nil then
-        FZebraDW := TZebraDW_BarCodeScanner.Create(OnScannerCompleted);
+        FZebraDW := TZebraDW_BarCodeScanner.Create(OnScannerCompleted, False);
     end
     else
       FreeAndNil(FZebraDW);
