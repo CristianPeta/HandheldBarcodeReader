@@ -206,7 +206,7 @@ end;
 procedure TZebraDW_BarCodeScanner.Unsubscribe;
 begin
   if FMessageSubscriptionID <> 0  then begin
-    TMessageManager.DefaultManager.Unsubscribe(TMessageResultNotification, FMessageSubscriptionID);
+    TMessageManager.DefaultManager.Unsubscribe(TMessageReceivedNotification, FMessageSubscriptionID);
     FMessageSubscriptionID := 0;
   end;
 end;
