@@ -26,14 +26,16 @@ uses
   {$ENDIF}
   FMX.Helpers.Android,
   FMX.Platform.Android,
-
+{$ENDIF}
   Androidapi.Interop.Scanner.Types,
   Androidapi.Interop.Scanner.ZebraDW,
-{$ENDIF}
+  {$IFDEF ZXingDelphi}
+  Androidapi.Interop.Scanner.ZXingDelphi,
+  {$ENDIF}
+  FMX.Graphics,
   FMX.Dialogs,
   FMX.Types;
 
-{$IFDEF Android}
 const
   LEFT_UP_KEY = 87;
   RIGHT_UP_KEY = 88;
@@ -43,15 +45,19 @@ const
 
 type
 {$SCOPEDENUMS ON}
-  TScannerType = (No, ZXing, Honeywell70e, Honeywell75e, ZebraEMDK, ZebraDataWedge);
+  TScannerType = (No, ZXing, Honeywell70e, Honeywell75e, ZebraEMDK, ZebraDataWedge, ZXingDelphi);
 
-  TBarCodeScanner = class(THandheld)
+  TBarCodeScanner = class{$IFDEF Android}(THandheld){$ENDIF}
   private
     FScanRequestCode: Integer;
     FScannerType: TScannerType;
     FZebra_EMDKManager_Created: Boolean;
     {$IFDEF BarcodeReader}
     FZebraDW: TZebraDW_BarCodeScanner;
+    {$ENDIF}
+    FVizualImageBitmap: TBitmap;//for ZXingDelphi
+    {$IFDEF ZXingDelphi}
+    FZXingDelphi: TZXingDelphi_BarCodeScanner;
     {$ENDIF}
     FOnScannerCompleted: TOnScannerCompleted;
 
@@ -61,18 +67,21 @@ type
     //ZXing
     const ScanRequestCode = 0;
     var FMessageSubscriptionID: Integer;
+    {$IFDEF Android}
     procedure HandleActivityMessage(const Sender: TObject; const M: TMessage);
     function OnActivityResult(RequestCode, ResultCode: Integer; Data: JIntent): Boolean;
+    {$ENDIF}
   public
     {Public declarations}
     OnScannerStatus: TOnScannerStatus;//for now only Zebra
     property OnScannerCompleted: TOnScannerCompleted read FOnScannerCompleted write SetOnScannerCompleted;
     procedure DoTriggerScan;
-    constructor Create;
-    {$IFDEF BarcodeReader}
+    procedure DoStopScan;
+    //AVizualImageBitmap can receive something like TImage.Bitmap to display the image
+    //it must be specified for ZXing.Delphi integration to work
+    constructor Create(AVizualImageBitmap: TBitmap = nil);
     procedure CreateDecodeManager;
     procedure DestroyDecodeManager;
-    {$ENDIF}
     destructor Destroy; override;
 
     property ScannerType: TScannerType read FScannerType write SetScannerType;
@@ -80,12 +89,10 @@ type
 
 var
   BarCodeScanner: TBarCodeScanner = nil;
-{$ENDIF}
 
 implementation
 
 {$IFDEF Android}
-
 function LaunchActivityForResult(const Intent: JIntent; RequestCode: Integer): Boolean;
 var
   ResolveInfo: JResolveInfo;
@@ -97,7 +104,9 @@ begin
     TAndroidHelper.Activity.startActivityForResult(Intent, RequestCode);
   {$ENDIF}
 end;
+{$ENDIF}
 
+{$IFDEF Android}
 procedure LaunchZXingScanner(RequestCode: Integer);
 var
   Intent: JIntent;
@@ -111,7 +120,9 @@ begin
     Toast('Cannot display ZXing scanner', ShortToast);
   {$ENDIF}
 end;
+{$ENDIF}
 
+{$IFDEF Android}
 // This is called from the Java activity's onBarCodeCompleteNative() method
 procedure onBarCodeCompleteNative(PEnv: PJNIEnv; This: JNIObject; BarCode: JNIString); cdecl;
 begin
@@ -122,7 +133,9 @@ begin
   {$ENDIF}
   Log.d('-onBarCodeCompleteNative');
 end;
+{$ENDIF}
 
+{$IFDEF Android}
 // This is called from the Java activity's onScannerStatusNative() method
 procedure onScannerStatusNative(PEnv: PJNIEnv; This: JNIObject; Status: JNIString); cdecl;
 begin
@@ -133,21 +146,30 @@ begin
   {$ENDIF}
   Log.d('-onScannerStatusNative');
 end;
+{$ENDIF}
 
-constructor TBarCodeScanner.Create;
+constructor TBarCodeScanner.Create(AVizualImageBitmap: TBitmap = nil);
+{$IFDEF Android}
 var
   PEnv: PJNIEnv;
   ActivityClass: JNIClass;
   NativeMethods: array [0 .. 1] of JNINativeMethod;
+{$ENDIF}
 begin
-  inherited;
+  inherited Create;
   FScannerType := TScannerType.No;
   FZebra_EMDKManager_Created := False;
   FScanRequestCode := 0;
+  FVizualImageBitmap := AVizualImageBitmap;
 
+  {$IFDEF Android}
   OnKeyDown := Self.ProcOnKeyDown;
+  {$ENDIF}
   OnScannerCompleted := nil;
   OnScannerStatus := nil;
+  {$IFDEF ZXingDelphi}
+  FZXingDelphi := nil;
+  {$ENDIF}
 
   {$IFDEF BarcodeReader}
   FZebraDW := nil;
@@ -179,8 +201,11 @@ begin
   inherited;
   {$IFDEF BarcodeReader}
   FZebraDW.Free;
-  DestroyDecodeManager;
   {$ENDIF}
+  {$IFDEF ZXingDelphi}
+  FZXingDelphi.Free;
+  {$ENDIF}
+  DestroyDecodeManager;
 end;
 
 procedure TBarCodeScanner.ProcOnKeyDown(Keycode: Word);
@@ -192,10 +217,10 @@ begin
   end;
 end;
 
-{$IFDEF BarcodeReader}
 procedure TBarCodeScanner.CreateDecodeManager;
 begin
   case FScannerType of
+    {$IFDEF BarcodeReader}
     TScannerType.Honeywell70e:
       begin
         Log.d('+WA_CreateDecodeManager');
@@ -219,19 +244,25 @@ begin
           Log.d('-WA_Zebra_Create_EMDKManager');
         end
       end;
+    {$ENDIF}
+    {$IFDEF Android}
     TScannerType.ZebraDataWedge:
       begin
         if Assigned(FZebraDW) then
           FZebraDW.Subscribe;
       end;
+    {$ENDIF}
+    {$IFDEF ZXingDelphi}
+    TScannerType.ZXingDelphi: ;
+    {$ENDIF}
+    TScannerType.No: ;
   end;
 end;
-{$ENDIF}
 
-{$IFDEF BarcodeReader}
 procedure TBarCodeScanner.DestroyDecodeManager;
 begin
   case FScannerType of
+    {$IFDEF BarcodeReader}
     TScannerType.Honeywell70e:
       begin
         Log.d('+WA_DestroyDecodeManager');
@@ -251,22 +282,53 @@ begin
 //        TJNativeActivitySubclass.Wrap(PANativeActivity(System.DelphiActivity)^.clazz).WA_Zebra_Destroy_EMDKManager;
 //        Log.d('-WA_Zebra_Destroy_EMDKManager');
       end;
+    {$ENDIF}
+    {$IFDEF Android}
     TScannerType.ZebraDataWedge:
       begin
         if Assigned(FZebraDW) then
           FZebraDW.Unsubscribe;
       end;
+    {$ENDIF}
+    {$IFDEF ZXingDelphi}
+    TScannerType.ZXingDelphi:
+      begin
+        if Assigned(FZXingDelphi) then
+          FZXingDelphi.StopCamera;
+      end;
+    {$ENDIF}
+    TScannerType.No: ;
   end;
 end;
-{$ENDIF}
+
+procedure TBarCodeScanner.DoStopScan;
+begin
+  case FScannerType of
+    {$IFDEF ZXingDelphi}
+    TScannerType.ZXingDelphi: begin
+      if Assigned(FZXingDelphi) then
+        FZXingDelphi.StopCamera;
+    end;
+    {$ENDIF}
+    TScannerType.No: ;
+  end;
+end;
 
 procedure TBarCodeScanner.DoTriggerScan;
 begin
   case FScannerType of
+    {$IFDEF Android}
     TScannerType.ZXing: begin
       FMessageSubscriptionID := TMessageManager.DefaultManager.SubscribeToMessage(TMessageResultNotification, HandleActivityMessage);
       LaunchZXingScanner(ScanRequestCode);
     end;
+    {$ENDIF}
+    {$IFDEF ZXingDelphi}
+    TScannerType.ZXingDelphi: begin
+      if Assigned(FZXingDelphi) then
+        FZXingDelphi.StartCamera;
+    end;
+    {$ENDIF}
     {$IFDEF BarcodeReader}
     TScannerType.Honeywell70e:
       begin
@@ -275,9 +337,11 @@ begin
         Log.d('-WA_doTriggerScan');
       end;
     {$ENDIF}
+    TScannerType.No: ;
   end;
 end;
 
+{$IFDEF Android}
 procedure TBarCodeScanner.HandleActivityMessage(const Sender: TObject; const M: TMessage);
 begin
   if M is TMessageResultNotification then begin
@@ -285,7 +349,9 @@ begin
       TMessageResultNotification(M).Value);
   end;
 end;
+{$ENDIF}
 
+{$IFDEF Android}
 function TBarCodeScanner.OnActivityResult(RequestCode, ResultCode: Integer; Data: JIntent): Boolean;
 var
   ScanContent, ScanFormat: string;
@@ -319,6 +385,7 @@ begin
     Result := True;
   end;
 end;
+{$ENDIF}
 
 procedure TBarCodeScanner.SetOnScannerCompleted(const Value: TOnScannerCompleted);
 begin
@@ -333,12 +400,10 @@ procedure TBarCodeScanner.SetScannerType(const Value: TScannerType);
 begin
   Log.d('+SetScannerType');
   if Value <> FScannerType then begin
-    {$IFDEF BarcodeReader}
     DestroyDecodeManager;
-    {$ENDIF}
     FScannerType := Value;
-    {$IFDEF BarcodeReader}
     CreateDecodeManager;
+    {$IFDEF BarcodeReader}
     //For ZEBRA DataWedge
     if FScannerType = TScannerType.ZebraDataWedge then begin
       if FZebraDW = nil then
@@ -347,9 +412,18 @@ begin
     else
       FreeAndNil(FZebraDW);
     {$ENDIF}
+    {$IFDEF ZXingDelphi}
+    //For ZXing.Delphi
+    if (FScannerType = TScannerType.ZXingDelphi)
+    and Assigned(FVizualImageBitmap) then begin
+      FreeAndNil(FZXingDelphi);
+      FZXingDelphi := TZXingDelphi_BarCodeScanner.Create(OnScannerCompleted, FVizualImageBitmap);
+    end
+    else
+      FreeAndNil(FZXingDelphi);
+    {$ENDIF}
   end;
   Log.d('-SetScannerType');
 end;
-{$ENDIF Android}
 
 end.
